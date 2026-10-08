@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeBank — Insurance Claim Form</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #0f172a; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 12px 18px 20px; }
+  header { background: linear-gradient(135deg, #1e3a8a, #312e81); color: #fff; border-radius: 12px; padding: 12px 18px; margin-bottom: 10px; }
+  header h1 { font-size: 17px; } header p { opacity: .85; font-size: 12px; margin-top: 2px; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 10px; }
+  .card h2 { font-size: 14px; color: #1e3a8a; margin-bottom: 8px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+  .field { display: flex; flex-direction: column; gap: 3px; }
+  .field.wide { grid-column: 1 / -1; }
+  label { font-size: 11.5px; font-weight: 600; color: #334155; }
+  input, select, textarea { border: 1px solid #cbd5e1; border-radius: 7px; padding: 6px 10px; font-size: 13px; background: #fff; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #3b82f6; border-color: #3b82f6; }
+  .hint { font-size: 11.5px; color: #64748b; }
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+  button.primary { background: #1e3a8a; color: #fff; border: 0; border-radius: 8px; padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  button.primary:hover { background: #1e40af; }
+  .success { display: none; background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; border-radius: 12px; padding: 26px; text-align: center; margin-top: 12px; }
+  .success h2 { color: #047857; font-size: 18px; } .success .tick { font-size: 34px; }
+  .privacy-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 12px; font-size: 11.5px; color: #92400e; margin-bottom: 10px; }
+  #agentPanel { position: fixed; top: 0; right: 0; width: 345px; height: 100vh; border: 0; border-left: 1px solid #334155; background: #0f172a; z-index: 999; }
+  @media (max-width: 1100px) { #agentPanel { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>SafeBank Insurance — Claim Application</h1>
+    <p>Fill in your details to register a health insurance claim. Your data stays on your device — the agent redacts it before any network call.</p>
+  </header>
+  <div class="privacy-note">🔒 Demo page — the browser agent on the right will fill this form, locally detect &amp; redact every sensitive field (Aadhaar, PAN, password…), and only send the anonymized screen to the server.</div>
+  <form id="claimForm">
+    <div class="card">
+      <h2>Applicant details</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="fullName">Full name (as per ID)</label>
+          <input id="fullName" name="fullName" type="text" autocomplete="name" placeholder="e.g. Priya Sharma">
+        </div>
+        <div class="field">
+          <label for="dob">Date of birth</label>
+          <input id="dob" name="dob" type="text" autocomplete="bday" placeholder="DD/MM/YYYY">
+        </div>
+        <div class="field">
+          <label for="email">Email address</label>
+          <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label for="phone">Mobile number</label>
+          <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="+91 98765 43210">
+        </div>
+        <div class="field wide">
+          <label for="address">Residential address</label>
+          <textarea id="address" name="address" rows="1" autocomplete="street-address" placeholder="House no, street, locality"></textarea>
+        </div>
+        <div class="field">
+          <label for="pincode">PIN code</label>
+          <input id="pincode" name="pincode" type="text" autocomplete="postal-code" placeholder="560001">
+        </div>
+        <div class="field">
+          <label for="aadhaar">Aadhaar number</label>
+          <input id="aadhaar" name="aadhaar" type="text" inputmode="numeric" placeholder="XXXX XXXX XXXX">
+          <div class="hint">Will be masked locally before any upload</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Bank &amp; identity documents</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="pan">PAN</label>
+          <input id="pan" name="pan" type="text" placeholder="ABCDE1234F">
+        </div>
+        <div class="field">
+          <label for="accountNo">Bank account number</label>
+          <input id="accountNo" name="accountNo" type="text" placeholder="50100234567890">
+        </div>
+        <div class="field">
+          <label for="ifsc">IFSC code</label>
+          <input id="ifsc" name="ifsc" type="text" placeholder="HDFC0001234">
+        </div>
+        <div class="field">
+          <label for="claimAmt">Claim amount (₹)</label>
+          <input id="claimAmt" name="claimAmt" type="text" placeholder="25000">
+        </div>
+        <div class="field">
+          <label for="password">Create login password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" placeholder="••••••••">
+          <div class="hint">Never transmitted — blacked out on-device</div>
+        </div>
+        <div class="field">
+          <label for="otp">OTP (sent to your mobile)</label>
+          <input id="otp" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code">
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary" id="submitBtn">Submit claim</button>
+      <span class="hint">The agent will fill &amp; submit this form autonomously.</span>
+    </div>
+  </form>
+  <div class="success" id="successBox">
+    <div class="tick">✅</div>
+    <h2>Claim submitted successfully!</h2>
+    <p>Reference no. SBI-2026-04821. Our team will verify your documents within 48 hours.</p>
+  </div>
+</div>
+<iframe id="agentPanel" src="/demo-panel.html?task=Fill%20the%20insurance%20claim%20form%20with%20demo%20details%20and%20submit"></iframe>
+<script>
+  const form = document.getElementById('claimForm');
+  const success = document.getElementById('successBox');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    form.style.display = 'none';
+    success.style.display = 'block';
+  });
+</script>
+<script src="/launcher.js"></script>
+</body>
+</html>

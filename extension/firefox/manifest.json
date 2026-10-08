@@ -1,0 +1,32 @@
+{
+  "manifest_version": 2,
+  "name": "Privacy Vision Agent",
+  "version": "0.1.0",
+  "description": "On-device visual perception agent: faces, passwords and PII are detected and redacted locally — the server only ever receives sanitized context.",
+  "permissions": ["activeTab", "storage", "<all_urls>"],
+  "background": { "scripts": ["background.js"] },
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_title": "Privacy Vision Agent"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": [
+        "vendor/ort/ort.all.min.js",
+        "engine/geometry.js",
+        "engine/pii-rules.js",
+        "engine/yunet.js",
+        "engine/extractor.js",
+        "engine/renderer.js",
+        "engine/vision-engine.js",
+        "engine/gateway.js",
+        "engine/client.js",
+        "content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+}

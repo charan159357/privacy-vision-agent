@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CloudDesk — Sign in</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: linear-gradient(160deg, #f8fafc 0%, #e2e8f0 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .login { width: 380px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 32px 30px; box-shadow: 0 10px 30px rgba(2, 6, 23, .08); }
+  .logo { width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; margin-bottom: 14px; }
+  h1 { font-size: 19px; color: #0f172a; } .sub { color: #64748b; font-size: 13px; margin: 4px 0 20px; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  label { font-size: 12.5px; font-weight: 600; color: #334155; }
+  input { border: 1px solid #cbd5e1; border-radius: 9px; padding: 10px 12px; font-size: 14px; }
+  input:focus { outline: 2px solid #6366f1; border-color: #6366f1; }
+  button { width: 100%; background: #4f46e5; color: #fff; border: 0; border-radius: 9px; padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 6px; }
+  button:hover { background: #4338ca; }
+  .hint { text-align: center; color: #94a3b8; font-size: 11.5px; margin-top: 14px; }
+  .success { display: none; text-align: center; padding: 10px 0; }
+  .success .tick { font-size: 30px; } .success h2 { font-size: 16px; color: #047857; margin: 6px 0 2px; }
+  #agentPanel { position: fixed; top: 0; right: 0; width: 345px; height: 100vh; border: 0; border-left: 1px solid #334155; background: #0f172a; z-index: 999; }
+  @media (max-width: 1100px) { #agentPanel { display: none; } }
+</style>
+</head>
+<body>
+<div class="login" id="loginBox">
+  <div class="logo">CD</div>
+  <h1>Sign in to CloudDesk</h1>
+  <div class="sub">Your work dashboard. The password field is blacked out on-device before anything leaves this tab.</div>
+  <form id="loginForm">
+    <div class="field">
+      <label for="username">Username or email</label>
+      <input id="username" name="username" type="text" autocomplete="username" placeholder="demo.user">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <button type="submit" id="loginBtn">Sign in</button>
+  </form>
+  <div class="hint">Demo credentials are filled by the agent with test values.</div>
+  <div class="success" id="successBox">
+    <div class="tick">👋</div>
+    <h2>Welcome back, demo.user!</h2>
+    <p style="color:#64748b;font-size:12.5px">You are signed in. Task complete.</p>
+  </div>
+</div>
+<iframe id="agentPanel" src="/demo-panel.html?task=Sign%20in%20to%20the%20dashboard%20with%20demo%20credentials"></iframe>
+<script>
+  const form = document.getElementById('loginForm');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    form.style.display = 'none';
+    document.getElementById('successBox').style.display = 'block';
+  });
+</script>
+<script src="/launcher.js"></script>
+</body>
+</html>

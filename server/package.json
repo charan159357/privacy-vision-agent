@@ -1,0 +1,18 @@
+{
+  "name": "privacy-vision-agent-server",
+  "version": "0.1.0",
+  "description": "Privacy-preserving visual perception agent — server side. Receives only redacted context (pva/v1 payloads), plans UI commands, and never stores user data.",
+  "type": "commonjs",
+  "main": "app/server.js",
+  "scripts": {
+    "start": "node app/server.js",
+    "dev": "node app/server.js",
+    "check": "node --check app/server.js && node --check app/planner.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["privacy", "vision", "agent", "redaction", "sih", "onnx", "webgpu"],
+  "license": "MIT",
+  "dependencies": {}
+}

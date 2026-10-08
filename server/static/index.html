@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy-Preserving Browser Agent — Demo Hub</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+  h1 { font-size: 26px; background: linear-gradient(90deg, #38bdf8, #a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { color: #94a3b8; margin: 8px 0 28px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  a.card { display: block; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 18px 20px; text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
+  a.card:hover { border-color: #38bdf8; transform: translateY(-2px); }
+  a.card h2 { font-size: 16px; color: #38bdf8; margin-bottom: 6px; }
+  a.card p { font-size: 13px; color: #94a3b8; }
+  .tag { display: inline-block; font-size: 11px; border: 1px solid #475569; border-radius: 10px; padding: 1px 8px; margin: 6px 4px 0 0; color: #cbd5e1; }
+  .arch { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 18px 20px; margin-top: 18px; font-size: 13px; color: #94a3b8; }
+  .arch code { color: #fbbf24; }
+  .steps { margin-top: 12px; }
+  .steps div { padding: 4px 0; border-bottom: 1px dashed #334155; }
+  .steps b { color: #e2e8f0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔒 On-Device Visual Perception for Light-weight Browser Agents</h1>
+  <div class="sub">A privacy-preserving vision agent: local ViT-grade vision (WebGPU/WASM) + PII redaction on-device, cloud-grade reasoning on sanitized context only.</div>
+  <div class="grid">
+    <a class="card" href="/demo/banking.html">
+      <h2>🏦 Insurance Claim Form</h2>
+      <p>PII-heavy form (Aadhaar, PAN, password, OTP…). Agent fills &amp; submits while redacting everything sensitive before each request.</p>
+      <span class="tag">end-to-end task</span><span class="tag">form filling</span><span class="tag">password black-out</span>
+    </a>
+    <a class="card" href="/demo/flight.html">
+      <h2>✈️ Flight Booking</h2>
+      <p>Multi-step workflow: search → select → passenger details → pay. Tests step-by-step planning over sanitized screens.</p>
+      <span class="tag">multi-step</span><span class="tag">card number redaction</span>
+    </a>
+    <a class="card" href="/demo/login.html">
+      <h2>🔐 Login Flow</h2>
+      <p>Username + password sign-in. Demonstrates blacked-out password fields that never leave the device.</p>
+      <span class="tag">authentication</span><span class="tag">OTP/password</span>
+    </a>
+    <a class="card" href="/demo/face.html">
+      <h2>🧑 Faces &amp; Documents</h2>
+      <p>Static showcase: on-device YuNet face blur, Aadhaar card redaction, document-image masking, text PII detection.</p>
+      <span class="tag">face blur</span><span class="tag">document masking</span><span class="tag">regex PII</span>
+    </a>
+    <a class="card" href="/eval.html">
+      <h2>📊 SIH Evaluation</h2>
+      <p>Runs all five evaluation metrics live in the browser (M1 visual context, M2 PII P/R, M3 redaction precision, M4 resources, M5 latency).</p>
+      <span class="tag">25% + 20% + 20% + 20% + 15%</span><span class="tag">scorecard</span>
+    </a>
+  </div>
+  <div class="arch">
+    <b style="color:#e2e8f0">How it works</b>
+    <div class="steps">
+      <div><b>① Capture</b> — the page is rendered to a canvas <i>on-device</i> (no screenshot service).</div>
+      <div><b>② Local vision</b> — DOM structure analysis (autocomplete/labels/values) + YuNet face detection via ONNX Runtime Web on <code>WebGPU → WASM</code>.</div>
+      <div><b>③ Redact</b> — faces blurred, passwords/OTP blacked out, PII masked with a deterministic strategy; pixel &amp; byte delta audited.</div>
+      <div><b>④ Privacy gateway</b> — a fetch/XHR guard re-scrubs any outgoing payload (defense in depth).</div>
+      <div><b>⑤ Server brain</b> — the <i>sanitized</i> screenshot + element map go to a planner (cloud LLM/VLM if a key is set, deterministic fallback offline) which returns commands.</div>
+      <div><b>⑥ Execute</b> — <code>click</code> / <code>type</code> / <code>scroll</code>… run locally until the task completes.</div>
+    </div>
+  </div>
+  <div class="arch">
+    <b style="color:#e2e8f0">Also in this repo</b>
+    <div class="steps">
+      <div>🧩 <b>Browser extension</b> (Chrome + Firefox) that runs the same engine on any site — load it via <code>extension/chrome</code> or <code>extension/firefox</code>.</div>
+      <div>📊 <b>Evaluation harness</b> — run <code>npm run eval</code> for the 5 SIH metrics (redaction accuracy, PII precision/recall, redaction precision, resource use, latency).</div>
+      <div>📄 <b>Docs</b> — architecture, threat model, metric formulas, demo script.</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SIH Evaluation — Privacy Vision Agent</title>
+<style>
+  :root { --bg:#0b1220; --card:#111a2e; --line:#1e293b; --tx:#e2e8f0; --mut:#94a3b8; --blue:#3b82f6; --green:#22c55e; --amber:#f59e0b; --red:#ef4444; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--tx); font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif; }
+  .wrap { max-width:1080px; margin:0 auto; padding:28px 20px 60px; }
+  header h1 { font-size:22px; margin:0 0 4px; }
+  header p { color:var(--mut); font-size:13px; margin:0 0 18px; }
+  .gauge { display:flex; gap:18px; align-items:center; background:linear-gradient(135deg,#1e3a8a,#312e81); border-radius:16px; padding:22px 26px; margin-bottom:22px; }
+  .gauge .big { font-size:52px; font-weight:800; letter-spacing:-1px; }
+  .gauge .sub { font-size:12px; opacity:.75; margin-top:2px; }
+  .gauge .meta { flex:1; font-size:12.5px; line-height:1.7; opacity:.92; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+  .card h2 { font-size:13px; margin:0 0 10px; color:#c7d2fe; text-transform:uppercase; letter-spacing:.06em; }
+  .score-row { display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px dashed var(--line); padding:6px 0; font-size:13px; }
+  .score-row:last-child { border-bottom:0; }
+  .score-row b { font-size:20px; }
+  .ok { color:var(--green); } .warn { color:var(--amber); } .bad { color:var(--red); }
+  .mut { color:var(--mut); }
+  table { width:100%; border-collapse:collapse; font-size:11.5px; margin-top:8px; }
+  th, td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--line); }
+  th { color:var(--mut); font-weight:600; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:10px; font-weight:700; }
+  .p-ok { background:#14532d33; color:var(--green); } .p-bad { background:#7f1d1d33; color:var(--red); }
+  button { background:var(--blue); color:#fff; border:0; border-radius:10px; padding:10px 22px; font-size:14px; font-weight:700; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .status { font-size:12.5px; color:var(--mut); margin:10px 0 0; min-height:18px; }
+  details { margin-top:10px; }
+  summary { cursor:pointer; font-size:12px; color:var(--mut); }
+  code { background:#0f172a; border:1px solid var(--line); border-radius:5px; padding:1px 5px; font-size:11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🛡 SIH Evaluation — Privacy-Preserving Browser Agent</h1>
+    <p>Everything runs <b>in this browser</b>: YuNet face detection (ONNX Runtime Web, WebGPU → WASM), PII classification, redaction, and a live round-trip to the agent server. No data leaves this page except the redacted <code>pva/v1</code> payload.</p>
+  </header>
+
+  <div class="gauge">
+    <div>
+      <div class="big" id="overall">—</div>
+      <div class="sub">OVERALL / 100</div>
+    </div>
+    <div class="meta" id="gaugeMeta">Press <b>Run evaluation</b> to execute the five SIH metrics (M1 25% · M2 20% · M3 20% · M4 20% · M5 15%).</div>
+  </div>
+
+  <div style="margin-bottom:16px"><button id="runBtn">▶ Run evaluation</button> <span class="status" id="status"></span></div>
+
+  <div class="grid" id="cards"></div>
+</div>
+
+<script src="/js/ort.all.min.js"></script>
+<script src="/js/engine/geometry.js"></script>
+<script src="/js/engine/pii-rules.js"></script>
+<script src="/js/engine/yunet.js"></script>
+<script src="/js/engine/extractor.js"></script>
+<script src="/js/engine/renderer.js"></script>
+<script src="/js/engine/vision-engine.js"></script>
+<script src="/js/engine/gateway.js"></script>
+<script>
+(function () {
+  'use strict';
+  const PVA = window.PVA;
+  window.ort.env.wasm.wasmPaths = '/ort/';
+  window.ort.env.wasm.numThreads = 1;
+
+  /* ---------------- fixtures (mirror of harness/fixtures.js) ---------------- */
+  const TEXT_FIXTURES = [
+    { text: 'Aadhaar: 1234 5678 9012', expect: [{ category: 'aadhaar', match: '1234 5678 9012' }] },
+    { text: 'My Aadhaar is 2345-6789-0123, keep it safe', expect: [{ category: 'aadhaar', match: '2345-6789-0123' }] },
+    { text: 'PAN number ABCDE1234F', expect: [{ category: 'pan', match: 'ABCDE1234F' }] },
+    { text: 'Call +91 98765 43210 or 9876543210', expect: [{ category: 'phone', match: '+91 98765 43210' }, { category: 'phone', match: '9876543210' }] },
+    { text: 'Email me at priya.sharma@example.com', expect: [{ category: 'email', match: 'priya.sharma@example.com' }] },
+    { text: 'Card 4111 1111 1111 1111 exp 12/28 cvv 123', expect: [{ category: 'credit_card', match: '4111 1111 1111 1111' }] },
+    { text: 'Card 1234 5678 9012 3456 (invalid luhn)', expect: [] },
+    { text: 'IFSC HDFC0001234, account 50100234567890', expect: [{ category: 'ifsc', match: 'HDFC0001234' }, { category: 'account_number', match: '50100234567890' }] },
+    { text: 'Account 50100234567890 is long but must NOT be aadhaar', expect: [{ category: 'account_number', match: '50100234567890' }] },
+    { text: 'DOB 15/08/1995', expect: [{ category: 'dob', match: '15/08/1995' }] },
+    { text: 'No sensitive data here, just prose about the weather.', expect: [] },
+    { text: 'PIN 560001 near MG Road Bengaluru', expect: [] },
+    { text: '12345', expect: [] },
+  ];
+  const FIELD_FIXTURES = [
+    { name: 'banking', elements: [
+      { label: 'Full name (as per ID)', inputType: 'text', autocomplete: 'name' },
+      { label: 'Date of birth', inputType: 'text', autocomplete: 'bday' },
+      { label: 'Email address', inputType: 'email' },
+      { label: 'Mobile number', inputType: 'tel' },
+      { label: 'Residential address', inputType: 'textarea', autocomplete: 'street-address' },
+      { label: 'PIN code', inputType: 'text', autocomplete: 'postal-code' },
+      { label: 'Aadhaar number', inputType: 'text' },
+      { label: 'PAN', inputType: 'text' },
+      { label: 'Bank account number', inputType: 'text' },
+      { label: 'IFSC code', inputType: 'text' },
+      { label: 'Create login password', inputType: 'password' },
+      { label: 'OTP (sent to your mobile)', inputType: 'text', autocomplete: 'one-time-code' },
+      { label: 'City', inputType: 'text' },
+      { label: 'Company name', inputType: 'text' },
+      { label: 'Comments', inputType: 'text' },
+    ], expect: ['name','dob','email','phone','address','pincode','aadhaar','pan','account_number','ifsc','password','otp',null,null,null] },
+    { name: 'flight', elements: [
+      { label: 'From', inputType: 'text' }, { label: 'To', inputType: 'text' }, { label: 'Travel date', inputType: 'text' },
+      { label: 'Passengers', inputType: 'select' }, { label: 'Search flights', inputType: 'button' }, { label: 'Book', inputType: 'button' },
+      { label: 'Passenger full name', inputType: 'text', autocomplete: 'name' }, { label: 'Email', inputType: 'email' },
+      { label: 'Mobile', inputType: 'tel' }, { label: 'Card number (for payment)', inputType: 'text', autocomplete: 'cc-number' },
+    ], expect: [null,null,null,null,null,null,'name','email','phone','credit_card'] },
+    { name: 'login', elements: [
+      { label: 'Username or email', inputType: 'text', autocomplete: 'username' }, { label: 'Password', inputType: 'password' },
+      { label: 'Sign in', inputType: 'button' },
+    ], expect: ['username','password',null] },
+  ];
+
+  function bankingScreen() {
+    const W = 640, H = 1100;
+    const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    const fields = [
+      ['Full name (as per ID)', 'Priya Sharma', 'text', 'name', 'name'],
+      ['Date of birth', '15/08/1995', 'text', 'bday', 'dob'],
+      ['Email address', 'priya.sharma@example.com', 'email', null, 'email'],
+      ['Mobile number', '+91 98765 43210', 'tel', null, 'phone'],
+      ['Residential address', '42 MG Road Bengaluru', 'textarea', 'street-address', 'address'],
+      ['PIN code', '560001', 'text', 'postal-code', 'pincode'],
+      ['Aadhaar number', '1234 5678 9012', 'text', null, 'aadhaar'],
+      ['PAN', 'ABCDE1234F', 'text', null, 'pan'],
+      ['Bank account number', '50100234567890', 'text', null, 'account_number'],
+      ['IFSC code', 'HDFC0001234', 'text', null, 'ifsc'],
+      ['Create login password', 'S3cret@123', 'password', null, 'password'],
+      ['City', 'Bengaluru', 'text', null, null],
+      ['Company name', 'Acme Pvt Ltd', 'text', null, null],
+      ['Comments', 'Looking forward to the claim', 'textarea', null, null],
+    ];
+    const elements = []; const gtRects = [];
+    let y = 24;
+    for (const [label, value, kind, ac, cat] of fields) {
+      const rect = { x: 20, y, w: 320, h: 34 };
+      y = rect.y + rect.h + 18;
+      ctx.font = '13px sans-serif'; ctx.fillStyle = '#334155'; ctx.textBaseline = 'top';
+      ctx.fillText(label, rect.x, rect.y - 16);
+      ctx.fillStyle = '#f8fafc'; ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1; ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillText(kind === 'password' ? '••••••••' : value, rect.x + 8, rect.y + 8);
+      const el = { role: 'input', rect, label, text: label, inputType: kind, value, interactive: true };
+      if (ac) el.autocomplete = ac;
+      elements.push(el);
+      if (cat) gtRects.push({ category: cat, rect: Object.assign({}, rect) });
+    }
+    elements.push({ role: 'button', label: 'Submit claim', text: 'Submit claim', rect: { x: 20, y: 980, w: 140, h: 40 }, interactive: true, uid: 99, value: 'Submit claim' });
+    return { canvas, imageData: ctx.getImageData(0, 0, W, H), elements, gtRects };
+  }
+
+  const PORTRAIT_B64 = "data:image/jpeg;base64,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";
+
+  /* ---------------- metric implementations ---------------- */
+  function metricPII() {
+    let tp = 0, fp = 0, fn = 0;
+    const detail = [];
+    for (const fx of TEXT_FIXTURES) {
+      const got = PVA.PII.scanText(fx.text);
+      const exp = fx.expect;
+      const expM = new Array(exp.length).fill(false);
+      const gotC = new Array(got.length).fill(false);
+      for (let i = 0; i < exp.length; i++) for (let j = 0; j < got.length; j++)
+        if (!gotC[j] && got[j].category === exp[i].category && got[j].match === exp[i].match) { expM[i] = true; gotC[j] = true; tp++; break; }
+      for (let i = 0; i < exp.length; i++) if (!expM[i]) fn++;
+      for (let j = 0; j < got.length; j++) if (!gotC[j]) fp++;
+      detail.push({ text: fx.text.slice(0, 52), n: exp.length + '/' + got.length, ok: exp.length === got.length && got.every(g => exp.some(e => e.category === g.category && e.match === g.match)) });
+    }
+    const p = tp / (tp + fp + 1e-9), r = tp / (tp + fn + 1e-9);
+    return { tp, fp, fn, p, r, f1: 2 * p * r / (p + r + 1e-9), detail };
+  }
+  function metricFields() {
+    let tp = 0, fp = 0, fn = 0;
+    const detail = [];
+    for (const fx of FIELD_FIXTURES) fx.elements.forEach((el, i) => {
+      const cls = PVA.PII.classifyField(el);
+      const expected = fx.expect[i];
+      if (expected) { if (cls && cls.category === expected) tp++; else { fn++; detail.push({ s: fx.name, l: el.label, v: 'FN(' + (cls ? cls.category : 'none') + ')' }); } }
+      else if (cls) { fp++; detail.push({ s: fx.name, l: el.label, v: 'FP(' + cls.category + ')' }); }
+    });
+    const p = tp / (tp + fp + 1e-9), r = tp / (tp + fn + 1e-9);
+    return { tp, fp, fn, p, r, f1: 2 * p * r / (p + r + 1e-9), detail };
+  }
+  async function metricScreen() {
+    const engine = new PVA.VisionEngine({ redactionStrategy: 'solid', faceStrategy: 'solid' });
+    const scr = bankingScreen();
+    const analysis = await engine.process({ imageData: scr.imageData, elements: scr.elements, viewport: { w: 640, h: 1100 }, scale: 1, task: 'none' });
+    const pred = analysis.detections.filter(d => d.redacted).map(d => d.redacted.rect);
+    const gt = scr.gtRects;
+    const matched = new Array(gt.length).fill(false);
+    let tp = 0;
+    for (let i = 0; i < gt.length; i++) for (let j = 0; j < pred.length; j++)
+      if (PVA.Geo.iou(gt[i].rect, pred[j]) >= 0.5) { matched[i] = true; break; }
+    for (let i = 0; i < gt.length; i++) if (matched[i]) tp++;
+    const boxRecall = tp / gt.length;
+    const boxPrecision = tp / (pred.length || 1);
+    let catOK = 0, catN = 0;
+    for (const g of gt) {
+      const hits = analysis.detections.filter(d => d.redacted && PVA.Geo.iou(g.rect, d.redacted.rect) >= 0.5);
+      if (hits.length) { catN++; if (hits.some(h => h.category === g.category)) catOK++; }
+    }
+    const catAcc = catN ? catOK / catN : 1;
+    const src = scr.imageData.data;
+    const out = analysis.redacted.canvas.getContext('2d').getImageData(0, 0, 640, 1100).data;
+    const W = 640, H = 1100;
+    function changedIn(rect) {
+      let c = 0, n = 0;
+      for (let y = Math.max(0, rect.y); y < Math.min(H, rect.y + rect.h); y += 2)
+        for (let x = Math.max(0, rect.x); x < Math.min(W, rect.x + rect.w); x += 2) {
+          const i = (y * W + x) * 4;
+          if (src[i] !== out[i] || src[i + 1] !== out[i + 1] || src[i + 2] !== out[i + 2]) c++;
+          n++;
+        }
+      return n ? c / n : 0;
+    }
+    const inBox = gt.map(g => changedIn(g.rect));
+    const inBoxAvg = inBox.reduce((a, b) => a + b, 0) / (inBox.length || 1);
+    const insideOf = g => (x, y) => x >= g.rect.x - 3 && x < g.rect.x + g.rect.w + 3 && y >= g.rect.y - 3 && y < g.rect.y + g.rect.h + 3;
+    let oc = 0, on = 0;
+    for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) {
+      if (gt.some(g => insideOf(g)(x, y))) continue;
+      const i = (y * W + x) * 4;
+      if (src[i] !== out[i] || src[i + 1] !== out[i + 1] || src[i + 2] !== out[i + 2]) oc++;
+      on++;
+    }
+    const outside = on ? oc / on : 0;
+    const summarized = analysis.payload.elements;
+    const gtFields = scr.elements.filter(e => e.role !== 'button');
+    const elMatched = gtFields.filter(el => summarized.some(s => s.piiCategory && PVA.Geo.iou(el.rect, s.rect) > 0.5)).length;
+    const elemIoU = gtFields.map(el => summarized.reduce((b, x) => Math.max(b, PVA.Geo.iou(el.rect, x.rect)), 0));
+    return { boxPrecision, boxRecall, catAcc, inBoxAvg, outside, elementRecall: elMatched / (gtFields.length || 1), meanIoU: elemIoU.reduce((a, b) => a + b, 0) / (elemIoU.length || 1), timing: analysis.timing, payloadKB: Math.round(analysis.redacted.bytes / 1024), detections: analysis.detections.map(d => d.category + ' ' + Math.round(d.confidence * 100) + '%') };
+  }
+  async function metricFace() {
+    const W = 512, H = 512;
+    const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    await new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0, W, H); res(); };
+      img.onerror = rej;
+      img.src = PORTRAIT_B64; // already a full data: URI
+    });
+    const imageData = ctx.getImageData(0, 0, W, H);
+    const detector = new PVA.YuNet.FaceDetector(window.ort);
+    await detector.load('/models/yunet.onnx', { preferWebGPU: !!navigator.gpu });
+    const runs = [];
+    let detections = null;
+    for (let i = 0; i < 3; i++) {
+      const t = performance.now();
+      detections = await detector.detect(imageData);
+      runs.push(performance.now() - t);
+    }
+    const inferMs = runs.slice(1).reduce((a, b) => a + b, 0) / Math.max(1, runs.length - 1);
+    const engine = new PVA.VisionEngine({ redactionStrategy: 'blur', faceStrategy: 'blur' });
+    engine.faceDetector = detector;
+    const analysis = await engine.process({ imageData, elements: [], viewport: { w: W, h: H }, scale: 1, task: 'redact faces' });
+    const faceBoxes = analysis.detections.filter(d => d.category === 'face').map(d => d.redacted ? d.redacted.rect : d.rect);
+    const src = imageData.data;
+    const out = analysis.redacted.canvas.getContext('2d').getImageData(0, 0, W, H).data;
+    let changed = 0, n = 0;
+    for (const b of faceBoxes) for (let y = b.y; y < Math.min(H, b.y + b.h); y += 2) for (let x = b.x; x < Math.min(W, b.x + b.w); x += 2) {
+      const i = (y * W + x) * 4;
+      if (src[i] !== out[i] || src[i + 1] !== out[i + 1] || src[i + 2] !== out[i + 2]) changed++;
+      n++;
+    }
+    return { faces: faceBoxes.length, scores: analysis.detections.filter(d => d.category === 'face').map(d => +d.confidence.toFixed(2)), inferMs: Math.round(inferMs), faceBoxPixelChanged: n ? changed / n : 0, timing: analysis.timing };
+  }
+  async function metricResources(screen, face) {
+    let modelBytes = 232589;
+    try { const r = await fetch('/models/yunet.onnx', { method: 'HEAD' }); modelBytes = parseInt(r.headers.get('Content-Length')) || modelBytes; } catch (e) {}
+    const score = (v, target) => Math.max(0, Math.min(1, 1 - v / target));
+    const sModel = score(modelBytes, 1 * 1024 * 1024);
+    const sPayload = score(screen.payloadKB, 300);
+    const sDom = score(screen.timing.dom, 50);
+    const sFace = score(face.inferMs, 600);
+    const sTotal = score(screen.timing.total, 1500);
+    return { score: 0.2 * sModel + 0.2 * sPayload + 0.2 * sDom + 0.2 * sFace + 0.2 * sTotal, components: { modelBytes, domMs: Math.round(screen.timing.dom), faceMs: face.inferMs, totalMs: Math.round(screen.timing.total), payloadKB: screen.payloadKB } };
+  }
+  async function metricE2E() {
+    const engine = new PVA.VisionEngine({ redactionStrategy: 'blur', faceStrategy: 'blur' });
+    const scr = bankingScreen();
+    const analysis = await engine.process({ imageData: scr.imageData, elements: scr.elements, viewport: { w: 640, h: 1100 }, scale: 1, task: 'Fill the insurance claim form with demo details and submit', step: 1 });
+    const payload = analysis.payload;
+    const t0 = performance.now();
+    let res;
+    try {
+      const r = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      res = await r.json();
+    } catch (e) { return { skipped: true, error: String(e.message || e) }; }
+    const latencyMs = Math.round(performance.now() - t0);
+    const mock = { filled: [], clicked: [] };
+    for (const c of (res.commands || [])) { if (c.action === 'type') mock.filled.push(c.text); if (c.action === 'click') mock.clicked.push(c.uid); }
+    const expectedFills = ['Priya Sharma', 'priya.sharma@example.com', '+91 98765 43210', '1234 5678 9012'];
+    const fillOK = expectedFills.every(v => mock.filled.includes(v));
+    const clickOK = mock.clicked.length >= 1;
+    const successPayload = Object.assign(JSON.parse(JSON.stringify(payload)), { step: (res.step || 2), elements: [{ role: 'element', id: 50, text: 'Claim submitted successfully! Thank you for your application', rect: { x: 100, y: 100, w: 400, h: 60 } }], redaction: Object.assign({}, payload.redaction, { categories: {} }) });
+    const t1 = performance.now();
+    const r2 = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(successPayload) });
+    const res2 = await r2.json();
+    return { latencyMs, latencyStep2: Math.round(performance.now() - t1), commands: (res.commands || []).length, fillOK, clickOK, doneDeclared: !!(res2 && res2.done), planMode: res.mode, auditOnPayload: PVA.Gateway.audit(payload).length === 0 };
+  }
+
+  /* ---------------- UI ---------------- */
+  const $ = id => document.getElementById(id);
+  function card(title, rows, extra) {
+    const el = document.createElement('div'); el.className = 'card';
+    el.innerHTML = '<h2>' + title + '</h2>' + rows.map(r => '<div class="score-row"><span>' + r[0] + '</span><b class="' + (r[2] || '') + '">' + r[1] + '</b></div>').join('') + (extra || '');
+    return el;
+  }
+  function fmt(x, d) { return typeof x === 'number' ? x.toFixed(d == null ? 2 : d) : String(x); }
+
+  async function run() {
+    $('runBtn').disabled = true;
+    const st = m => { $('status').textContent = '⏳ ' + m; };
+    try {
+      st('PII text + field fixtures…');
+      const pii = metricPII();
+      const fields = metricFields();
+      st('Synthetic banking screen (redaction proof)…');
+      const screen = await metricScreen();
+      st('YuNet face detection (WebGPU/WASM)…');
+      const face = await metricFace();
+      st('Resource accounting…');
+      const res = await metricResources(screen, face);
+      st('Live round-trip to /api/agent…');
+      const e2e = await metricE2E();
+
+      const M1 = 100 * (0.5 * screen.catAcc + 0.5 * screen.boxRecall);
+      const M2 = 100 * (0.6 * pii.f1 + 0.4 * fields.f1);
+      const M3 = 100 * (0.5 * screen.boxPrecision + 0.5 * Math.min(1, screen.inBoxAvg / 0.95));
+      const M4 = 100 * res.score;
+      const M5 = e2e.skipped ? null : 100 * Math.max(0, Math.min(1, 1 - e2e.latencyMs / 8000));
+      const overall = 0.25 * M1 + 0.20 * M2 + 0.20 * M3 + 0.20 * M4 + 0.15 * (M5 == null ? 0 : M5);
+
+      $('overall').textContent = overall.toFixed(1);
+      $('gaugeMeta').innerHTML = (e2e.skipped ? '⚠ M5 skipped — is the agent server running? (<code>scripts/dev.sh</code>) ' : '') +
+        'M1 ' + M1.toFixed(1) + ' · M2 ' + M2.toFixed(1) + ' · M3 ' + M3.toFixed(1) + ' · M4 ' + M4.toFixed(1) + ' · M5 ' + (M5 == null ? '—' : M5.toFixed(1));
+
+      const grid = $('cards');
+      grid.innerHTML = '';
+      grid.appendChild(card('M1 · Visual context accuracy (25%)', [
+        ['Category accuracy', fmt(screen.catAcc * 100, 1) + '%', screen.catAcc >= 0.9 ? 'ok' : 'bad'],
+        ['Redaction box recall', fmt(screen.boxRecall * 100, 1) + '%', screen.boxRecall >= 0.9 ? 'ok' : 'bad'],
+        ['Element recall (context)', fmt(screen.elementRecall * 100, 1) + '%'],
+        ['Mean element IoU', fmt(screen.meanIoU, 3)],
+        ['Detections', screen.detections.slice(0, 6).join(' · ')],
+      ]));
+      grid.appendChild(card('M2 · PII detection P/R (20%)', [
+        ['Text precision', fmt(pii.p * 100, 1) + '% (tp ' + pii.tp + ', fp ' + pii.fp + ')', pii.fp === 0 ? 'ok' : 'bad'],
+        ['Text recall', fmt(pii.r * 100, 1) + '% (fn ' + pii.fn + ')', pii.fn === 0 ? 'ok' : 'bad'],
+        ['Field precision', fmt(fields.p * 100, 1) + '% (tp ' + fields.tp + ', fp ' + fields.fp + ')', fields.fp === 0 ? 'ok' : 'bad'],
+        ['Field recall', fmt(fields.r * 100, 1) + '% (fn ' + fields.fn + ')', fields.fn === 0 ? 'ok' : 'bad'],
+        ['Text F1 / Field F1', fmt(pii.f1, 3) + ' / ' + fmt(fields.f1, 3)],
+      ], '<details><summary>fixture detail</summary><table><tr><th>text</th><th>exp/found</th><th></th></tr>' +
+        pii.detail.map(d => '<tr><td>' + d.text + '</td><td>' + d.n + '</td><td><span class="pill ' + (d.ok ? 'p-ok' : 'p-bad') + '">' + (d.ok ? 'PASS' : 'FAIL') + '</span></td></tr>').join('') +
+        fields.detail.map(d => '<tr><td>[' + d.s + '] ' + d.l + '</td><td colspan="2"><span class="pill p-bad">' + d.v + '</span></td></tr>').join('') + '</table></details>'));
+      grid.appendChild(card('M3 · Redaction precision (20%)', [
+        ['Box precision', fmt(screen.boxPrecision * 100, 1) + '%', screen.boxPrecision >= 0.95 ? 'ok' : 'bad'],
+        ['Box recall', fmt(screen.boxRecall * 100, 1) + '%'],
+        ['Pixels changed inside GT', fmt(screen.inBoxAvg * 100, 1) + '%', screen.inBoxAvg >= 0.9 ? 'ok' : 'bad'],
+        ['Pixels changed outside GT', fmt(screen.outside * 100, 3) + '%', screen.outside === 0 ? 'ok' : 'warn'],
+        ['Face-box pixel coverage', fmt(face.faceBoxPixelChanged * 100, 1) + '%'],
+      ]));
+      grid.appendChild(card('M4 · Client resource utilization (20%)', [
+        ['YuNet model', fmt(res.components.modelBytes / 1024, 0) + ' KB (≤1 MB)', res.components.modelBytes <= 1e6 ? 'ok' : 'bad'],
+        ['Redacted payload', res.components.payloadKB + ' KB (≤300 KB)', res.components.payloadKB <= 300 ? 'ok' : 'bad'],
+        ['DOM analysis', res.components.domMs + ' ms (≤50 ms)', res.components.domMs <= 50 ? 'ok' : 'bad'],
+        ['Face inference', res.components.faceMs + ' ms (≤600 ms)', res.components.faceMs <= 600 ? 'ok' : 'bad'],
+        ['Full pipeline', res.components.totalMs + ' ms (≤1500 ms)', res.components.totalMs <= 1500 ? 'ok' : 'bad'],
+        ['ORT runtime', 'WebGPU → WASM, ~33 MB wasm (cached once)'],
+      ]));
+      grid.appendChild(card('M5 · End-to-end latency (15%)', e2e.skipped ? [['Skipped', 'server not reachable', 'bad'], ['Error', e2e.error]] : [
+        ['Server round-trip', e2e.latencyMs + ' ms (8 s budget)', e2e.latencyMs < 2000 ? 'ok' : 'warn'],
+        ['Done-detection step', e2e.latencyStep2 + ' ms'],
+        ['Commands planned', e2e.commands + ' (mode ' + e2e.planMode + ')'],
+        ['Fills correct', e2e.fillOK ? '✓ yes' : '✗ no', e2e.fillOK ? 'ok' : 'bad'],
+        ['Submit click', e2e.clickOK ? '✓ yes' : '✗ no', e2e.clickOK ? 'ok' : 'bad'],
+        ['Server declared done', e2e.doneDeclared ? '✓ yes' : '✗ no', e2e.doneDeclared ? 'ok' : 'bad'],
+        ['Payload audit (gateway)', e2e.auditOnPayload ? '0 leaks ✓' : 'leaks!', e2e.auditOnPayload ? 'ok' : 'bad'],
+      ]));
+      grid.appendChild(card('Face detection (YuNet, on-device)', [
+        ['Faces found', face.faces + ' (scores ' + face.scores.join(', ') + ')', face.faces >= 1 ? 'ok' : 'bad'],
+        ['Inference (WASM/WebGPU)', face.inferMs + ' ms'],
+        ['Redaction strategy', 'blur · solid for passwords/OTP'],
+        ['PII categories', '12 (aadhaar, pan, phone, email, card, cvv, otp, password, name, dob, address, account, ifsc, pincode…)'],
+      ], '<p class="mut" style="font-size:11px">Scores shown are the SIH weights: M1 25% · M2 20% · M3 20% · M4 20% · M5 15%.</p>'));
+
+      $('status').textContent = '✅ evaluation complete — ' + overall.toFixed(1) + '/100';
+    } catch (e) {
+      $('status').textContent = '❌ ' + String(e && e.message || e);
+    }
+    $('runBtn').disabled = false;
+  }
+  $('runBtn').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

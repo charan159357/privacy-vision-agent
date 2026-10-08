@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Privacy Vision Agent</title>
+<style>
+  body { width: 300px; font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, sans-serif; margin: 0; background: #f8fafc; }
+  .head { background: linear-gradient(135deg, #1e3a8a, #312e81); color: #fff; padding: 12px 14px; }
+  .head h1 { margin: 0; font-size: 14px; }
+  .head p { margin: 2px 0 0; font-size: 10.5px; opacity: .8; }
+  .body { padding: 12px 14px; }
+  .field { margin-bottom: 10px; }
+  label { font-size: 11px; font-weight: 600; color: #334155; display: block; margin-bottom: 3px; }
+  input, select { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  button { padding: 8px 10px; border: 0; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; background: #1e3a8a; color: #fff; }
+  button.sec { background: #e2e8f0; color: #334155; }
+  .stat { display: flex; justify-content: space-between; font-size: 11px; color: #475569; padding: 3px 0; border-top: 1px solid #e2e8f0; }
+  .stat b { color: #0f172a; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; background: #e2e8f0; color: #475569; }
+  .b-running, .b-loading { background: #dcfce7; color: #166534; }
+  .b-done { background: #dbeafe; color: #1e40af; }
+  .b-error { background: #fee2e2; color: #991b1b; }
+  .note { font-size: 10.5px; color: #64748b; margin-top: 10px; line-height: 1.5; }
+  .foot { font-size: 9.5px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>🛡 Privacy Vision Agent <span class="badge" id="state">off</span></h1>
+    <p>On-device redaction · nothing sensitive leaves this device</p>
+  </div>
+  <div class="body">
+    <div class="field">
+      <label>Agent server</label>
+      <input id="serverUrl" value="http://127.0.0.1:8787/api/agent" />
+    </div>
+    <div class="field">
+      <label>Task</label>
+      <input id="task" value="Fill the insurance claim form with demo details and submit" />
+    </div>
+    <div class="field">
+      <label>Redaction</label>
+      <select id="strategy"><option value="blur">Blur</option><option value="solid">Solid black</option></select>
+    </div>
+    <div class="row">
+      <button id="start">▶ Start on this tab</button>
+      <button id="stop" class="sec">Stop</button>
+    </div>
+    <div class="stat"><span>Faces redacted</span><b id="faces">—</b></div>
+    <div class="stat"><span>PII types</span><b id="pii">—</b></div>
+    <div class="stat"><span>Pixel delta</span><b id="delta">—</b></div>
+    <div class="stat"><span>Gateway scrubbed</span><b id="gw">—</b></div>
+    <div class="note">Start the local server (<code>scripts/dev.sh</code>) and open the banking demo (<code>http://127.0.0.1:8787/demo/banking.html</code>) — the agent will fill &amp; submit the form while the server only ever sees redacted pixels.</div>
+    <div class="foot">Face detection: YuNet 2023 · ONNX Runtime Web (WebGPU → WASM)</div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

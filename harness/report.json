@@ -1,0 +1,479 @@
+{
+  "generatedAt": "2026-08-29T06:51:45.466Z",
+  "overall": 98.3,
+  "overallLabel": "",
+  "metrics": {
+    "M1_visualContext": {
+      "score": 100,
+      "weight": 0.25,
+      "categoryAccuracy": 1,
+      "meanElementIoU": 1,
+      "elementRecall": 1
+    },
+    "M2_piiDetection": {
+      "score": 100,
+      "weight": 0.2,
+      "text": {
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "tp": 11,
+        "fp": 0,
+        "fn": 0
+      },
+      "fields": {
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "tp": 18,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "M3_redaction": {
+      "score": 100,
+      "weight": 0.2,
+      "boxPrecision": 1,
+      "boxRecall": 1,
+      "pixelsChangedInsideGT": 1,
+      "pixelsChangedOutsideGT": 0
+    },
+    "M4_resources": {
+      "score": 91.8,
+      "weight": 0.2,
+      "modelBytes": 232589,
+      "ortJs": 710522,
+      "wasm": 11018731,
+      "ortSessionInputBytes": 4915200,
+      "domMs": 0.35465100000000405,
+      "faceMs": 19,
+      "totalMs": 11.366685000000004,
+      "payloadKB": 42,
+      "notes": [
+        "YuNet model 227 KB (target <1 MB → 78%)",
+        "ORT runtime JS 694 KB + WASM 10.5 MB (loaded once, cached)",
+        "face-model input buffer 4.69 MB",
+        "redacted payload 42 KB for a full page snapshot"
+      ]
+    },
+    "M5_e2eLatency": {
+      "score": 99.5,
+      "weight": 0.15,
+      "latencyMs": 37,
+      "latencyStep2": 4,
+      "commands": 11,
+      "fillOK": true,
+      "clickOK": true,
+      "doneDeclared": true,
+      "planMode": "fallback",
+      "auditOnPayload": true
+    }
+  },
+  "detail": {
+    "textFixtures": [
+      {
+        "text": "Aadhaar: 1234 5678 9012",
+        "expected": 1,
+        "found": 1,
+        "ok": true,
+        "foundDetail": [
+          "aadhaar:1234 5678 9012"
+        ]
+      },
+      {
+        "text": "My Aadhaar is 2345-6789-0123, keep it safe",
+        "expected": 1,
+        "found": 1,
+        "ok": true,
+        "foundDetail": [
+          "aadhaar:2345-6789-0123"
+        ]
+      },
+      {
+        "text": "PAN number ABCDE1234F",
+        "expected": 1,
+        "found": 1,
+        "ok": true,
+        "foundDetail": [
+          "pan:ABCDE1234F"
+        ]
+      },
+      {
+        "text": "Call +91 98765 43210 or 9876543210",
+        "expected": 2,
+        "found": 2,
+        "ok": true,
+        "foundDetail": [
+          "phone:+91 98765 43210",
+          "phone:9876543210"
+        ]
+      },
+      {
+        "text": "Email me at priya.sharma@example.com",
+        "expected": 1,
+        "found": 1,
+        "ok": true,
+        "foundDetail": [
+          "email:priya.sharma@example.com"
+        ]
+      },
+      {
+        "text": "Card 4111 1111 1111 1111 exp 12/28 cvv 123",
+        "expected": 1,
+        "found": 1,
+        "ok": true,
+        "foundDetail": [
+          "credit_card:4111 1111 1111 1111"
+        ]
+      },
+      {
+        "text": "Card 1234 5678 9012 3456 (invalid luhn)",
+        "expected": 0,
+        "found": 0,
+        "ok": true,
+        "foundDetail": []
+      },
+      {
+        "text": "IFSC HDFC0001234, account 50100234567890",
+        "expected": 2,
+        "found": 2,
+        "ok": true,
+        "foundDetail": [
+          "ifsc:HDFC0001234",
+          "account_number:50100234567890"
+        ]
+      },
+      {
+        "text": "Account 50100234567890 is long but must NOT be aadhaar",
+        "expected": 1,
+        "found": 1,
+        "ok": true,
+        "foundDetail": [
+          "account_number:50100234567890"
+        ]
+      },
+      {
+        "text": "DOB 15/08/1995",
+        "expected": 1,
+        "found": 1,
+        "ok": true,
+        "foundDetail": [
+          "dob:15/08/1995"
+        ]
+      },
+      {
+        "text": "No sensitive data here, just prose about the weather.",
+        "expected": 0,
+        "found": 0,
+        "ok": true,
+        "foundDetail": []
+      },
+      {
+        "text": "PIN 560001 near MG Road Bengaluru",
+        "expected": 0,
+        "found": 0,
+        "ok": true,
+        "foundDetail": []
+      },
+      {
+        "text": "12345",
+        "expected": 0,
+        "found": 0,
+        "ok": true,
+        "foundDetail": []
+      }
+    ],
+    "fieldFixtures": [
+      {
+        "scenario": "banking",
+        "label": "Full name (as per ID)",
+        "expected": "name",
+        "got": "name",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "Date of birth",
+        "expected": "dob",
+        "got": "dob",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "Email address",
+        "expected": "email",
+        "got": "email",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "Mobile number",
+        "expected": "phone",
+        "got": "phone",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "Residential address",
+        "expected": "address",
+        "got": "address",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "PIN code",
+        "expected": "pincode",
+        "got": "pincode",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "Aadhaar number",
+        "expected": "aadhaar",
+        "got": "aadhaar",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "PAN",
+        "expected": "pan",
+        "got": "pan",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "Bank account number",
+        "expected": "account_number",
+        "got": "account_number",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "IFSC code",
+        "expected": "ifsc",
+        "got": "ifsc",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "Create login password",
+        "expected": "password",
+        "got": "password",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "OTP (sent to your mobile)",
+        "expected": "otp",
+        "got": "otp",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "banking",
+        "label": "City",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      },
+      {
+        "scenario": "banking",
+        "label": "Company name",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      },
+      {
+        "scenario": "banking",
+        "label": "Comments",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      },
+      {
+        "scenario": "flight",
+        "label": "From",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      },
+      {
+        "scenario": "flight",
+        "label": "To",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      },
+      {
+        "scenario": "flight",
+        "label": "Travel date",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      },
+      {
+        "scenario": "flight",
+        "label": "Passengers",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      },
+      {
+        "scenario": "flight",
+        "label": "Search flights",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      },
+      {
+        "scenario": "flight",
+        "label": "Book",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      },
+      {
+        "scenario": "flight",
+        "label": "Passenger full name",
+        "expected": "name",
+        "got": "name",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "flight",
+        "label": "Email",
+        "expected": "email",
+        "got": "email",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "flight",
+        "label": "Mobile",
+        "expected": "phone",
+        "got": "phone",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "flight",
+        "label": "Card number (for payment)",
+        "expected": "credit_card",
+        "got": "credit_card",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "login",
+        "label": "Username or email",
+        "expected": "username",
+        "got": "username",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "login",
+        "label": "Password",
+        "expected": "password",
+        "got": "password",
+        "verdict": "TP"
+      },
+      {
+        "scenario": "login",
+        "label": "Sign in",
+        "expected": "clean",
+        "got": null,
+        "verdict": "TN"
+      }
+    ],
+    "screenDetections": [
+      {
+        "category": "name",
+        "conf": 0.95,
+        "source": "autocomplete"
+      },
+      {
+        "category": "dob",
+        "conf": 0.9,
+        "source": "text"
+      },
+      {
+        "category": "email",
+        "conf": 0.9,
+        "source": "text"
+      },
+      {
+        "category": "phone",
+        "conf": 0.9,
+        "source": "text"
+      },
+      {
+        "category": "address",
+        "conf": 0.95,
+        "source": "autocomplete"
+      },
+      {
+        "category": "pincode",
+        "conf": 0.95,
+        "source": "autocomplete"
+      },
+      {
+        "category": "aadhaar",
+        "conf": 0.9,
+        "source": "text"
+      },
+      {
+        "category": "pan",
+        "conf": 0.9,
+        "source": "text"
+      },
+      {
+        "category": "account_number",
+        "conf": 0.9,
+        "source": "text"
+      },
+      {
+        "category": "ifsc",
+        "conf": 0.9,
+        "source": "text"
+      },
+      {
+        "category": "password",
+        "conf": 0.98,
+        "source": "type"
+      }
+    ],
+    "face": {
+      "faces": 1,
+      "scores": [
+        0.95
+      ],
+      "inferMs": 19,
+      "faceBoxPixelChanged": 0.98
+    },
+    "timings": {
+      "screen": {
+        "dom": 0.35465100000000405,
+        "face": 0.06499099999999913,
+        "faceInfer": 0,
+        "redact": 4.6085159999999945,
+        "encode": 4.482668000000004,
+        "total": 11.366685000000004
+      },
+      "face": {
+        "dom": 0.0036059999999906722,
+        "face": 16.412376000000023,
+        "faceInfer": 9.307798999999989,
+        "redact": 2.6950729999999794,
+        "encode": 2.6854999999999905,
+        "total": 20.988923
+      }
+    },
+    "resourceBytes": {
+      "modelBytes": 232589,
+      "ortJs": 710522,
+      "wasm": 11018731,
+      "ortSessionInputBytes": 4915200,
+      "domMs": 0.35465100000000405,
+      "faceMs": 19,
+      "totalMs": 11.366685000000004,
+      "payloadKB": 42
+    }
+  },
+  "elapsedSec": 0.2
+}

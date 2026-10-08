@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent Panel</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --line:#334155; --txt:#e2e8f0; --dim:#94a3b8; --acc:#38bdf8; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--txt); font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 10px; }
+  h1 { font-size: 13px; color: var(--acc); margin-bottom: 6px; letter-spacing: .4px; }
+  h1 span { color: var(--dim); font-weight: normal; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 10px; margin-left: 6px; vertical-align: 1px; }
+  .b-run { background:#14532d; color: var(--ok); } .b-idle { background:#1e293b; color: var(--dim); }
+  .b-done { background:#1e3a8a; color:#93c5fd; } .b-err { background:#7f1d1d; color: var(--bad); }
+  .row { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  button { background:#0ea5e9; color:#082f49; border:0; border-radius:6px; padding:5px 10px; font:600 11px ui-sans-serif,system-ui; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+  button:disabled { opacity:.4; cursor: default; }
+  select, input[type=text] { background:#0f172a; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:4px 6px; font:11px ui-monospace,monospace; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px; margin-top:8px; }
+  .card h2 { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .grid2 canvas { width:100%; border:1px solid var(--line); border-radius:4px; background:#000; image-rendering:auto; }
+  .cap { font-size:10px; color:var(--dim); margin-top:2px; text-align:center; }
+  table { width:100%; border-collapse:collapse; font-size:10.5px; }
+  td, th { padding:2px 4px; border-bottom:1px solid #0f172a; text-align:left; }
+  th { color:var(--dim); font-weight:normal; }
+  .cat { display:inline-block; padding:0 6px; border-radius:8px; font-size:10px; margin:1px 2px 1px 0; }
+  .stat { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px dashed #0f172a; }
+  .stat b { color:var(--ok); }
+  .log { max-height:130px; overflow-y:auto; font-size:10.5px; color:var(--dim); }
+  .log div { padding:1px 0; border-bottom:1px dotted #0f172a; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+  .step-line { color:var(--acc); }
+  .muted { color:var(--dim); }
+  .kbd { background:#0f172a; border:1px solid var(--line); border-radius:4px; padding:0 5px; }
+  .pill { display:inline-block; background:#0f172a; border:1px solid var(--line); border-radius:10px; padding:1px 8px; font-size:10px; color:var(--dim); margin-right:4px; }
+  a { color: var(--acc); }
+</style>
+</head>
+<body>
+<h1>Privacy Vision Agent <span>· on-device</span><span id="stateBadge" class="badge b-idle">idle</span></h1>
+<div class="row">
+  <button id="btnStart">▶ Run task</button>
+  <button id="btnPause" class="ghost" disabled>Pause</button>
+  <button id="btnOnce" class="ghost">Analyze once</button>
+</div>
+<div class="row">
+  <label class="muted">redact:</label>
+  <select id="selStrategy">
+    <option value="blur">blur</option><option value="solid">solid</option>
+  </select>
+  <label class="muted">faces:</label>
+  <select id="selFace">
+    <option value="blur">blur</option><option value="solid">solid</option>
+  </select>
+  <label class="muted">scale:</label>
+  <select id="selScale"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option></select>
+</div>
+<div class="row">
+  <span class="pill" id="pStep">step —</span>
+  <span class="pill" id="pFaces">faces —</span>
+  <span class="pill" id="pPII">PII —</span>
+</div>
+<div class="card">
+  <h2>Screen capture · original vs redacted</h2>
+  <div class="grid2">
+    <div><canvas id="cvOrig" width="320" height="180"></canvas><div class="cap">original (on-device only)</div></div>
+    <div><canvas id="cvRed" width="320" height="180"></canvas><div class="cap">sanitized (sent to server)</div></div>
+  </div>
+</div>
+<div class="card">
+  <h2>Detections <span class="muted" id="detCount"></span></h2>
+  <div id="detList" class="muted">—</div>
+</div>
+<div class="card">
+  <h2>Privacy audit</h2>
+  <div id="auditBox">
+    <div class="stat"><span>pixels altered</span><b id="aPixel">—</b></div>
+    <div class="stat"><span>redaction coverage</span><b id="aCov">—</b></div>
+    <div class="stat"><span>compressed byte delta</span><b id="aByte">—</b></div>
+    <div class="stat"><span>gateway scrubs</span><b id="aGW">—</b></div>
+    <div class="stat"><span>payload size</span><b id="aSize">—</b></div>
+  </div>
+</div>
+<div class="card">
+  <h2>Latency (ms)</h2>
+  <div id="latBox">
+    <div class="stat"><span>DOM analysis</span><b id="lDom">—</b></div>
+    <div class="stat"><span>face inference</span><b id="lFace">—</b></div>
+    <div class="stat"><span>redaction+encode</span><b id="lRed">—</b></div>
+    <div class="stat"><span>network round-trip</span><b id="lNet">—</b></div>
+    <div class="stat"><span>command exec</span><b id="lExec">—</b></div>
+    <div class="stat"><span>TOTAL tick</span><b id="lTot">—</b></div>
+  </div>
+</div>
+<div class="card">
+  <h2>Command log</h2>
+  <div id="cmdLog" class="log">—</div>
+</div>
+<div class="card">
+  <h2>Agent notes</h2>
+  <div id="noteBox" class="log muted">—</div>
+</div>
+
+<script src="/js/ort.all.min.js"></script>
+<script src="/js/engine/geometry.js"></script>
+<script src="/js/engine/pii-rules.js"></script>
+<script src="/js/engine/yunet.js"></script>
+<script src="/js/engine/extractor.js"></script>
+<script src="/js/engine/renderer.js"></script>
+<script src="/js/engine/gateway.js"></script>
+<script src="/js/engine/vision-engine.js"></script>
+<script src="/js/engine/client.js"></script>
+<script>
+(function () {
+  'use strict';
+  const q = new URLSearchParams(location.search);
+  const task = q.get('task') || '';
+  const PVA = window.PVA;
+
+  // ONNX Runtime Web config: WASM binaries served locally (no CDN).
+  // numThreads=1 keeps us off cross-origin-isolation requirements; the
+  // WebGPU path (jsep) is used automatically when available.
+  window.ort.env.wasm.wasmPaths = '/ort/';
+  window.ort.env.wasm.numThreads = 1;
+
+  PVA.MODELS = PVA.MODELS || { yunet: '/models/yunet.onnx' };
+
+  const $ = id => document.getElementById(id);
+  const stateEl = $('stateBadge');
+
+  function setState(s) {
+    stateEl.className = 'badge b-' + (s === 'running' ? 'run' : s === 'error' ? 'err' : s === 'done' ? 'done' : 'idle');
+    stateEl.textContent = s;
+    $('btnStart').disabled = s === 'running' || s === 'loading';
+    $('btnPause').disabled = s !== 'running';
+    if (window.parent !== window) {
+      try { window.parent.postMessage({ from: 'pva-panel', type: 'pva:state', state: s }, '*'); } catch (e) {}
+    }
+  }
+
+  let agent = null;
+  let lastAnalysis = null;
+
+  const CAT_COLORS = { password:'#e11d48', otp:'#e11d48', face:'#f59e0b', aadhaar:'#a78bfa', pan:'#a78bfa', credit_card:'#38bdf8', cvv:'#38bdf8', phone:'#4ade80', email:'#4ade80', name:'#fb923c', dob:'#fb923c', address:'#fb923c', account_number:'#38bdf8', ifsc:'#38bdf8', pincode:'#94a3b8', username:'#94a3b8', document_image:'#a78bfa' };
+
+  function drawTo(cv, source, w, h) {
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const ar = source.width / source.height;
+    let dw = cv.width, dh = cv.width / ar;
+    if (dh > cv.height) { dh = cv.height; dw = cv.height * ar; }
+    ctx.drawImage(source, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh);
+  }
+
+  function pct(v) { return (v * 100).toFixed(1) + '%'; }
+
+  function renderAnalysis(a) {
+    lastAnalysis = a;
+    if (a) {
+      drawTo($('cvOrig'), agent.lastCanvas, 320, 180);
+      drawTo($('cvRed'), a.redacted.canvas, 320, 180);
+      const dets = a.detections || [];
+      $('detCount').textContent = dets.length + ' region(s)';
+      const byCat = {};
+      dets.forEach(d => byCat[d.category] = (byCat[d.category] || 0) + 1);
+      let html = '';
+      dets.slice(0, 12).forEach(d => {
+        const c = CAT_COLORS[d.category] || '#f87171';
+        html += `<div><span class="cat" style="background:${c}22;color:${c}">${d.category}</span>` +
+          `<span class="muted">${Math.round(d.confidence * 100)}% · ${d.source}` +
+          (d.match ? ' · "' + d.match.slice(0, 24) + '"' : '') +
+          ` · (${d.redacted ? d.redacted.rect.x : d.rect.x},${d.redacted ? d.redacted.rect.y : d.rect.y} ${d.redacted ? d.redacted.rect.w : d.rect.w}×${d.redacted ? d.redacted.rect.h : d.rect.h})` +
+          (d.redacted ? ' · ' + d.redacted.strategy : '') + `</span></div>`;
+      });
+      $('detList').innerHTML = html || 'no sensitive content detected';
+      $('aPixel').textContent = pct(a.audit.pixelDelta);
+      $('aCov').textContent = pct(a.audit.redactionCoverage);
+      $('aByte').textContent = pct(a.audit.byteDelta);
+      $('aGW').textContent = (agent.gateway.stats.scrubbedBodies + agent.gateway.stats.scrubbedHeaders) + ' request(s) scrubbed';
+      $('aSize').textContent = (a.redacted.bytes / 1024).toFixed(1) + ' KB';
+      $('lDom').textContent = a.timing.dom.toFixed(0);
+      $('lFace').textContent = (a.timing.faceInfer || 0).toFixed(0) + (a.timing.face > a.timing.faceInfer ? ' (+' + (a.timing.face - a.timing.faceInfer).toFixed(0) + ' ovh)' : '');
+      $('lRed').textContent = a.timing.redact.toFixed(0);
+      $('lTot').textContent = a.timing.total.toFixed(0);
+      $('pFaces').textContent = 'faces ' + (a.counts.face || 0);
+      const pii = Object.keys(a.counts).filter(k => k !== 'face').length;
+      $('pPII').textContent = 'PII ' + pii + ' type(s)';
+    }
+    if (window.parent !== window) {
+      try { window.parent.postMessage({ from: 'pva-panel', type: 'pva:analysis', counts: a.counts, pixelDelta: a.audit ? a.audit.pixelDelta : 0 }, '*'); } catch (e) {}
+    }
+  }
+
+  function log(msg, cls) {
+    const box = $('cmdLog');
+    const div = document.createElement('div');
+    div.className = cls || '';
+    div.textContent = msg;
+    box.prepend(div);
+    while (box.children.length > 40) box.removeChild(box.lastChild);
+  }
+
+  function note(msg) {
+    const box = $('noteBox');
+    const div = document.createElement('div');
+    div.textContent = msg;
+    box.prepend(div);
+    while (box.children.length > 12) box.removeChild(box.lastChild);
+  }
+
+  function buildAgent() {
+    const opts = {
+      serverUrl: '/api/agent',
+      captureScale: parseFloat($('selScale').value),
+      pollMs: 1800,
+      sendImage: true,
+      redactionStrategy: $('selStrategy').value,
+      faceStrategy: $('selFace').value,
+      enableFace: true,
+      task,
+      win: window.parent,
+      doc: window.parent.document,
+      onState: setState,
+      onAnalysis: renderAnalysis,
+      onCommands: ev => {
+        $('pStep').textContent = 'step ' + ev.step;
+        (ev.commands || []).forEach(c => log(`→ ${c.action}${c.uid != null ? ' #' + c.uid : ''}${c.text ? ' "' + c.text + '"' : ''}`, 'step-line'));
+        (ev.notes || []).forEach(n => { if (!n.ok) log('✗ ' + n.action + ': ' + (n.error || ''), 'bad'); });
+      },
+      onError: e => { log('✗ ' + e, 'bad'); note('error: ' + e); },
+      onServer: r => { if (r) { note((r.note || '') + (r.mode ? ' [' + r.mode + ']' : '')); if (r.latencyMs != null) $('lNet').textContent = r.latencyMs.toFixed(0); if (r.received) note('server saw: ' + r.received.categoriesRedacted ? JSON.stringify(r.received.categoriesRedacted) : ''); } },
+    };
+    agent = new PVA.Client.Agent(window.ort, opts);
+    window.__agent = agent; // debug hook
+    return agent;
+  }
+
+  $('btnStart').onclick = async () => {
+    if (!agent) buildAgent();
+    agent.opts.redactionStrategy = $('selStrategy').value;
+    agent.opts.faceStrategy = $('selFace').value;
+    agent.opts.captureScale = parseFloat($('selScale').value);
+    log('▶ task: "' + task + '"');
+    agent.start();
+  };
+  $('btnPause').onclick = () => agent.state === 'running' ? (agent.pause(), log('⏸ paused')) : (agent.resume(), log('▶ resumed'));
+  $('btnOnce').onclick = async () => {
+    if (!agent) buildAgent();
+    agent.opts.redactionStrategy = $('selStrategy').value;
+    agent.opts.faceStrategy = $('selFace').value;
+    agent.opts.captureScale = parseFloat($('selScale').value);
+    log('◉ analyzing once…');
+    try {
+      const a = await agent.analyzeOnce({ send: true });
+      log('◉ done — ' + a.detections.length + ' detections', 'ok');
+    } catch (e) { log('✗ ' + e, 'bad'); }
+  };
+
+  /* ---- talk to the host page (demo / extension) ---- */
+  function tellParent(m) {
+    try { window.parent.postMessage(Object.assign({ from: 'pva-panel' }, m), '*'); } catch (e) {}
+  }
+  window.addEventListener('message', ev => {
+    const d = ev.data || {};
+    if (d.type === 'pva:start') { if (typeof $('btnStart').onclick === 'function') $('btnStart').onclick(); }
+    else if (d.type === 'pva:analyze') { if (typeof $('btnOnce').onclick === 'function') $('btnOnce').onclick(); }
+    else if (d.type === 'pva:stop') { if (agent) agent.stop(); }
+  });
+
+  setState('idle');
+  if (!task) note('no task set — pass ?task=… to the panel URL');
+  else note('task: ' + task);
+})();
+</script>
+</body>
+</html>
